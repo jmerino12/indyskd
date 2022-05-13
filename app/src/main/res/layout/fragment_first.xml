@@ -13,56 +13,40 @@
         android:layout_alignParentRight="true"
         android:layout_marginEnd="0dp"
         android:layout_marginRight="0dp">
-        <LinearLayout
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
-                android:padding="16dp">
-
-                <Button
-                    android:id="@+id/btnCreateInvitation"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Crear invitación" />
-
-                <Button
-                    android:id="@+id/btnAcceptInvitation"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Aceptar invitacion" />
-
-                <Button
-                    android:id="@+id/btnSendMessage"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Enviar mensaje" />
-
-                <Button
-                    android:id="@+id/btnGetCredential"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Obtener credenciales" />
-
-            </LinearLayout>
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:padding="16dp"
                 android:layout_weight="1">
                 <Button
-                    android:id="@+id/btnConnectMediator"
+                    android:id="@+id/btnAcceptInvitationOutBound"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Registrar Mediador"/>
+                    android:text="Aceptar invitacion outbound - Mediador" />
+                <Button
+                    android:id="@+id/btnRegisterMediator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Registrar Mediador" />
+
+
+                <Button
+                    android:id="@+id/btnAcceptInvitationOutBoundAgent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Aceptar invitacion outbound - Agent" />
+
+                <Button
+                    android:id="@+id/btnGetStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Get status" />
             </LinearLayout>
-        </LinearLayout>
+        </ScrollView>
 
 
 
-    </ScrollView>
+    </RelativeLayout>
 
-</RelativeLayout>

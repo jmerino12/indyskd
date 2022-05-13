@@ -10,18 +10,18 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.google.gson.Gson
 import com.jmb.indyskd.databinding.FragmentFirstBinding
-import com.jmb.indyskd.models.CreateInvitationResponse
-import com.jmb.indyskd.models.Invitation
-import com.jmb.indyskd.models.ReceiveInvitation
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.jmb.indyskd.model.InvitationOutBand
+import com.jmb.indyskd.model.ResponseReceiveInvitation
+import com.jmb.indyskd.utils.Service
+import kotlinx.coroutines.*
 import org.hyperledger.aries.api.AriesController
 import org.hyperledger.aries.ariesagent.Ariesagent
 import org.hyperledger.aries.config.Options
 import org.hyperledger.aries.models.RequestEnvelope
 import org.hyperledger.aries.models.ResponseEnvelope
+import retrofit2.Call
+import retrofit2.Retrofit
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.nio.charset.StandardCharsets
 
 
@@ -33,8 +33,15 @@ class FirstFragment : Fragment() {
 
     private lateinit var agent: AriesController
     private lateinit var handler: MyHandler
+    private lateinit var retrofit: Retrofit
+    private lateinit var call: Call<String>
     private val agentURL = "192.168.0.12"
-    var gson = Gson()
+    private val mediatorURL = "http://192.168.0.12:8051"
+    private var gson = Gson()
+
+    //===============
+    private var invitation = ""
+    private var connectionIdRegisterMediator = ""
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -46,36 +53,51 @@ class FirstFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+
+        retrofit = Retrofit.Builder()
+            .baseUrl(mediatorURL)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .build()
+        val service: Service = retrofit.create(Service::class.java)
+        call = service.invitation
         super.onViewCreated(view, savedInstanceState)
         GlobalScope.launch {
             createAgent()
         }
 
-        binding.btnCreateInvitation.setOnClickListener {
-            GlobalScope.launch {
-                createInvitation()
-            }
+
+        binding.btnAcceptInvitationOutBound.setOnClickListener {
+            acceptInvitationOutBound()
         }
 
-        binding.btnConnectMediator.setOnClickListener {
-            GlobalScope.launch {
-                registerMediator()
-            }
+
+        binding.btnGetStatus.setOnClickListener {
+            getStatus()
         }
+
+        binding.btnAcceptInvitationOutBoundAgent.setOnClickListener {
+            acceptInvitationOutBound()
+        }
+
+        binding.btnRegisterMediator.setOnClickListener {
+            registerMediator()
+        }
+        binding.btnAcceptInvitationOutBoundAgent.setOnClickListener {
+            acceptInvitationOutBoundAgent()
+        }
+
 
     }
 
 
     private suspend fun createAgent() = withContext(Dispatchers.IO) {
         val opts = Options()
-        opts.agentURL =
-            "http://$agentURL:8021"
-        //opts.websocketURL = "ws://$agentURL:8030"
         opts.label = "EPM Agent"
         opts.autoAccept = true
         opts.addOutboundTransport("ws")
         opts.transportReturnRoute = "all"
-        opts.useLocalAgent = false
+        opts.useLocalAgent = true
+        opts.logLevel = "DEBUG"
 
         // create an aries agent instance
         try {
@@ -98,129 +120,107 @@ class FirstFragment : Fragment() {
     }
 
 
+
+
+
     /**
-     * Conexion con el agente
+     * Conexion con el mediador con outbound
      *
      */
 
-    private suspend fun createInvitation() = withContext(Dispatchers.IO) {
-        val reqData = ""
-        val requestEnvelope = RequestEnvelope(reqData.toByteArray(StandardCharsets.UTF_8))
-        try {
-            val didex = agent.didExchangeController
-            val res = didex.createInvitation(requestEnvelope)
-            if (res.error != null) {
-                val error = res.error.message
-                Log.e("createInvitation", error)
-            } else {
-                val acceptedInvitation = String(res.payload)
-                val newInvitation = acceptedInvitation.replace("0.0.0.0",agentURL)
-                val json = gson.fromJson(newInvitation, CreateInvitationResponse::class.java)
-                Log.i("createInvitation", json.toString())
-                receiveInvitation(json.invitation)
-
-            }
-        } catch (e: Exception) {
-            Log.e("createInvitation", e.message.toString())
-        }
-    }
-
-    private suspend fun receiveInvitation(dataInvitation: Invitation) = withContext(Dispatchers.IO) {
-        val reqData = "{}"
+    private fun acceptInvitationOutBound() {
         val res: ResponseEnvelope
         try {
-            // call did exchange method
-            val data: ByteArray = gson.toJson(dataInvitation).toByteArray()
+            val dataInvitation =
+                "{\"invitation\":{\"@id\":\"1384ca2e-2f28-4990-b694-f0eea1c6b176\",\"@type\":\"https://didcomm.org/out-of-band/1.0/invitation\",\"label\":\"Mediador\",\"services\":[{\"id\":\"b70af629-f643-4197-acdf-303634a22543\",\"type\":\"did-communication\",\"recipientKeys\":[\"did:key:z6MkjD3SLFwnNexGYx2JN2hzLSzy171tw7rg4kretDSYEwj6\"],\"serviceEndpoint\":\"ws://192.168.1.11:8091\"}],\"accept\":[\"didcomm/aip2;env=rfc19\"],\"handshake_protocols\":[\"https://didcomm.org/didexchange/1.0\"]},\"my_label\":\"mediador\"}"
+            val data: ByteArray =
+                dataInvitation.toByteArray(StandardCharsets.UTF_8)
             val requestEnvelope = RequestEnvelope(data)
-            val didex = agent.didExchangeController
-            res = didex.receiveInvitation(requestEnvelope)
+            val didex = agent.outOfBandController
+            res = didex.acceptInvitation(requestEnvelope)
             if (res.error != null && res.error.message.isNotEmpty()) {
                 val error = res.error.message
-                Log.e("ReceiveInvitation", error)
+                Log.e("aceptarInvitationOutBound", error)
             } else {
                 val receiveInvitationResponse = String(res.payload, StandardCharsets.UTF_8)
-                val json = gson.fromJson(receiveInvitationResponse, ReceiveInvitation::class.java)
-                Log.i("ReceiveInvitation", json.toString())
-                acceptInvitation(json)
+                connectionIdRegisterMediator = receiveInvitationResponse
+                Log.i("aceptarInvitationOutBound", receiveInvitationResponse)
+
             }
-        } catch (e: java.lang.Exception) {
+        } catch (e: Exception) {
             Toast.makeText(context, "You need create an agent", Toast.LENGTH_LONG).show()
-            e.printStackTrace()
+            Log.e("aceptarInvitationOutBound", e.message.toString())
         }
-
     }
-    private suspend fun acceptInvitation(invitation: ReceiveInvitation) = withContext(Dispatchers.IO) {
 
-        val requestEnvelope = RequestEnvelope(invitation.connectionId.toByteArray(StandardCharsets.UTF_8))
+    private fun acceptInvitationOutBoundAgent() {
+        val dataModel = gson.fromJson(connectionIdRegisterMediator, InvitationOutBand::class.java )
+        val res: ResponseEnvelope
         try {
-            val didex = agent.didExchangeController
-            val res = didex.acceptInvitation(requestEnvelope)
-            if (res.error != null) {
+            val dataInvitation =
+                "{\"invitation\":{\"@id\":\"4366513f-7b83-411f-a636-327710343ec1\",\"@type\":\"https://didcomm.org/out-of-band/1.0/invitation\",\"label\":\"Agente EPM\",\"services\":[{\"id\":\"1bf1f0b0-3644-412a-b04a-e1ae8e850284\",\"type\":\"did-communication\",\"recipientKeys\":[\"did:key:z6Mknf4B4qViedzEGgmUXb1uDXdG7AZPL8AEQqPAp6rxLCwe\"],\"serviceEndpoint\":\"ws://192.168.1.11:9094\"}],\"accept\":[\"didcomm/aip2;env=rfc19\"],\"handshake_protocols\":[\"https://didcomm.org/didexchange/1.0\"]},\"my_label\":\"AgenteEPM\",\"router_connections\":\"${dataModel.connectionId}\"}"
+            val data: ByteArray =
+                dataInvitation.toByteArray(StandardCharsets.UTF_8)
+            val requestEnvelope = RequestEnvelope(data)
+            val didex = agent.outOfBandController
+            res = didex.acceptInvitation(requestEnvelope)
+            if (res.error != null && res.error.message.isNotEmpty()) {
                 val error = res.error.message
-                Log.e("AcceptInvitation", error)
+                Log.e("acceptInvitationOutBoundAgent", error)
             } else {
-                val acceptedInvitation = String(res.payload, StandardCharsets.UTF_8)
-                Log.i("AcceptInvitation", acceptedInvitation)
+                val paylod = String(res.payload, StandardCharsets.UTF_8)
+                Log.i("acceptInvitationOutBoundAgent", paylod)
+
             }
         } catch (e: Exception) {
-            Log.e("AcceptInvitation", e.message.toString())
+            Toast.makeText(context, "You need create an agent", Toast.LENGTH_LONG).show()
+            Log.e("acceptInvitationOutBoundAgent", e.message.toString())
         }
-
     }
 
-    private suspend fun getCredentials() = withContext(Dispatchers.IO) {
-        var res = ResponseEnvelope()
+    private fun registerMediator() {
+        val dataModel = gson.fromJson(connectionIdRegisterMediator, InvitationOutBand::class.java )
+        val res: ResponseEnvelope
         try {
-
-            // create a controller
-            val v = agent.verifiableController
-
-            // perform an operation
-            val data = "".toByteArray(StandardCharsets.UTF_8)
-            res = v.getCredentials(RequestEnvelope(data))
-        } catch (e: Exception) {
-            Log.e("GetCredential", e.localizedMessage)
-        }
-        if (res.error != null) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "You need create an agent", Toast.LENGTH_LONG).show()
-            }
-            if (res.error.message != "") {
-                println(res.error.message)
-            }
-        }
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, String(res.payload, StandardCharsets.UTF_8), Toast.LENGTH_LONG)
-                .show()
-        }
-
-    }
-
-
-    /**
-     * Conexion con el mediador
-     *
-     */
-    private suspend fun registerMediator() = withContext(Dispatchers.IO) {
-        val reqData =
-            "{\"@type\":\"https://didcomm.org/connections/1.0/invitation\",\"@id\":\"a1373d71-3094-46fe-95e2-5394e25dae44\",\"label\":\"Aries Framework JavaScript Mediator\",\"recipientKeys\":[\"9Q7fjjKCXuhQbYHgpBUSw9ApLA5UNKVbZEBoq37qTmgs\"],\"serviceEndpoint\":\"https://$agentURL:3001\",\"routingKeys\":[]}"
-        val requestEnvelope = RequestEnvelope(reqData.toByteArray(StandardCharsets.UTF_8))
-        try {
+            val dataInvitation = "{\"connectionID\":\"${dataModel.connectionId}\"}"
+            val data: ByteArray =
+                dataInvitation.toByteArray(StandardCharsets.UTF_8)
+            val requestEnvelope = RequestEnvelope(data)
             val mediator = agent.mediatorController
-            val res = mediator.register(requestEnvelope)
-            if (res.error != null) {
+            res = mediator.register(requestEnvelope)
+            if (res.error != null && res.error.message.isNotEmpty()) {
                 val error = res.error.message
                 Log.e("registerMediator", error)
             } else {
-                val payload = String(res.payload, StandardCharsets.UTF_8)
-                Log.i("registerMediator", payload)
+                val registerMediator = String(res.payload, StandardCharsets.UTF_8)
+                Log.e("registerMediator", registerMediator)
+
             }
         } catch (e: Exception) {
-            Log.e("registerMediator", e.message.toString())
+            Toast.makeText(context, "You need create an agent", Toast.LENGTH_LONG).show()
+            Log.e("aceptarInvitationOutBound", e.message.toString())
         }
     }
 
-
+    private fun getStatus() {
+        val res: ResponseEnvelope
+        try {
+            val data: ByteArray = "{}".toByteArray()
+            val requestEnvelope = RequestEnvelope(data)
+            val didex = agent.didExchangeController
+            res = didex.queryConnections(requestEnvelope)
+            if (res.error != null && !res.error.message.isEmpty()) {
+                val error = res.error.message
+                Log.e("getMediator", error)
+            } else {
+                val receiveInvitationResponse = String(res.payload, StandardCharsets.UTF_8)
+                Log.i("getMediator", receiveInvitationResponse)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "You need create an agent", Toast.LENGTH_LONG).show()
+            Log.e("receiveInvitationMediator", e.message.toString())
+        }
+    }
 
 
     /**
@@ -260,5 +260,6 @@ class FirstFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
 
 }
